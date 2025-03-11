@@ -1,0 +1,165 @@
+body {
+    font-family: 'Montserrat', sans-serif; /* Современный шрифт */
+    background-color: #FFFFFF; /* Белый фон */
+    color: #000000; /* Черный текст */
+    margin: 0;
+    padding: 0;
+}
+
+.navbar {
+    background-color: #FFFFFF; /* Белая навигация */
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    padding: 15px 0;
+}
+
+.navbar-brand {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #E63946 !important; /* Красный акцент для логотипа */
+}
+
+.nav-link {
+    font-weight: 500;
+    color: #000000 !important;
+    transition: color 0.3s;
+}
+
+.nav-link:hover {
+    color: #E63946 !important; /* Красный при наведении */
+}
+
+.container {
+    max-width: 1200px;
+    padding: 40px 20px;
+}
+
+h1, h2 {
+    font-weight: 700;
+    color: #E63946; /* Красный для заголовков */
+    position: relative;
+    margin-bottom: 20px;
+}
+
+/* Асимметричная красная линия под заголовками */
+h2::before {
+    content: '';
+    position: absolute;
+    top: -10px;
+    left: 0;
+    width: 50px;
+    height: 4px;
+    background-color: #E63946;
+}
+
+.card {
+    background-color: #D3D3D3; /* Серый фон карточек */
+    border: none;
+    border-radius: 0; /* Прямые углы для минимализма */
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+    transition: transform 0.2s ease-in-out;
+}
+
+.card:hover {
+    transform: translateY(-5px);
+}
+
+.card-title {
+    font-weight: 600;
+    color: #000000;
+}
+
+.card-text {
+    font-weight: 300;
+    color: #333;
+}
+
+.btn-primary {
+    background-color: #E63946; /* Красный для основных кнопок */
+    border: none;
+    border-radius: 0;
+    padding: 10px 20px;
+    color: #FFFFFF;
+    font-weight: 500;
+    transition: background-color 0.3s;
+}
+
+.btn-primary:hover {
+    background-color: #C62828; /* Темнее красный при наведении */
+    color: #FFFFFF;
+}
+
+.btn-secondary {
+    background-color: #D3D3D3; /* Серый для второстепенных кнопок */
+    border: none;
+    border-radius: 0;
+    padding: 10px 20px;
+    color: #000000;
+    font-weight: 500;
+    transition: background-color 0.3s;
+}
+
+.btn-secondary:hover {
+    background-color: #B0B0B0;
+    color: #000000;
+}
+
+.btn-warning {
+    background-color: #E63946; /* Красный для редактирования */
+    border: none;
+    border-radius: 0;
+    padding: 5px 10px;
+    color: #FFFFFF;
+}
+
+.btn-warning:hover {
+    background-color: #C62828;
+    color: #FFFFFF;
+}
+
+.btn-danger {
+    background-color: #D3D3D3; /* Серый для удаления */
+    border: none;
+    border-radius: 0;
+    padding: 5px 10px;
+    color: #000000;
+}
+
+.btn-danger:hover {
+    background-color: #B0B0B0;
+    color: #000000;
+}
+
+.alert-warning {
+    background-color: #D3D3D3; /* Серый фон уведомлений */
+    color: #E63946; /* Красный текст */
+    border: none;
+    border-left: 4px solid #E63946; /* Красная линия слева */
+    border-radius: 0;
+}
+
+.form-control, .form-select {
+    background-color: #D3D3D3; /* Серый фон полей ввода */
+    border: none;
+    border-radius: 0;
+    color: #000000;
+}
+
+.form-control:focus, .form-select:focus {
+    border: 1px solid #E63946;
+    box-shadow: none;
+}
+
+.text-danger {
+    color: #E63946 !important; /* Устаревшие версии */
+    font-weight: bold;
+}
+
+.text-success {
+    color: #000000 !important; /* Актуальные версии */
+    font-weight: bold;
+}
+
+/* Добавляем отступы между секциями */
+section {
+    margin-bottom: 60px;
+}
