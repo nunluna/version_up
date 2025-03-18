@@ -1,6 +1,9 @@
-from flask import Flask, render_template, request, redirect, url_for
+from flask import Flask, render_template, request, redirect, url_for, jsonify
 from database import db
-from version_fetcher import fetch_latest_version  # Импорт модуля
+from version_fetcher import fetch_latest_version_cached
+from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime, timedelta
+from functools import lru_cache
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///version_control.db'
@@ -8,7 +11,6 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db.init_app(app)
 
 from models import Software, Device, InstalledSoftware
-
 
 # Функция сравнения версий
 def is_version_outdated(installed_version, latest_version):
@@ -19,10 +21,24 @@ def is_version_outdated(installed_version, latest_version):
     except (ValueError, AttributeError):
         return installed_version != latest_version
 
-
-# Инициализация базы данных
+# Инициализация базы данных и добавление предустановленного ПО
 with app.app_context():
     db.create_all()
+    # Проверяем, есть ли записи в таблице Software
+    if Software.query.count() == 0:
+        predefined_software_names = [
+            'Visual Studio Code', 'PyCharm', 'Git', 'Node.js', 'Python', 'Docker', 'Kubernetes',
+            'IntelliJ IDEA', 'WebStorm', 'Ruby', 'Rails', 'PHP', 'Laravel', 'Java', 'Android Studio'
+        ]
+        for name in predefined_software_names:
+            latest_version = fetch_latest_version_cached(name)
+            software = Software(
+                name=name,
+                current_version=latest_version if latest_version != "Неизвестно" else "Unknown",
+                latest_version=latest_version if latest_version != "Неизвестно" else "Unknown"
+            )
+            db.session.add(software)
+        db.session.commit()
 
 # Главная страница
 @app.route('/')
@@ -31,62 +47,51 @@ def index():
     devices = Device.query.all()
     installed = InstalledSoftware.query.all()
 
-    # Обновляем актуальные версии с помощью модуля
-    for software in software_list:
-        latest_version = fetch_latest_version(software.name)
+    # Параллельное обновление версий
+    with ThreadPoolExecutor() as executor:
+        latest_versions = list(executor.map(fetch_latest_version_cached, [s.name for s in software_list]))
+
+    for software, latest_version in zip(software_list, latest_versions):
         if latest_version != "Неизвестно":
             software.latest_version = latest_version
     db.session.commit()
 
-    # Проверяем статус актуальности
+    # Проверка статуса актуальности с обработкой None
     for inst in installed:
-        inst.outdated = is_version_outdated(inst.installed_version, inst.software.latest_version)
+        if inst.software and inst.software.latest_version:  # Проверяем, что software существует и имеет latest_version
+            inst.outdated = is_version_outdated(inst.installed_version, inst.software.latest_version)
+        else:
+            inst.outdated = False  # Если software отсутствует, считаем не устаревшим
 
-    # Список предустановленных ПО
     predefined_software = [
-        {'name': 'Visual Studio Code'},
-        {'name': 'PyCharm'},
-        {'name': 'Git'},
-        {'name': 'Node.js'},
-        {'name': 'Python'},
-        {'name': 'Docker'},
-        {'name': 'Kubernetes'},
-        {'name': 'IntelliJ IDEA'},
-        {'name': 'WebStorm'},
-        {'name': 'Ruby'},
-        {'name': 'Rails'},
-        {'name': 'PHP'},
-        {'name': 'Laravel'},
-        {'name': 'Java'},
-        {'name': 'Android Studio'}
+        {'name': name, 'latest_version': next((s.latest_version for s in software_list if s.name.lower() == name.lower()), fetch_latest_version_cached(name))}
+        for name in ['Visual Studio Code', 'PyCharm', 'Git', 'Node.js', 'Python', 'Docker', 'Kubernetes',
+                     'IntelliJ IDEA', 'WebStorm', 'Ruby', 'Rails', 'PHP', 'Laravel', 'Java', 'Android Studio']
     ]
 
-    # Для каждого ПО добавляем актуальную версию
-    for software in predefined_software:
-        software['latest_version'] = fetch_latest_version(software['name'])
+    return render_template('index.html', software_list=software_list, devices=devices,
+                          installed=installed, predefined_software=predefined_software)
 
-    return render_template('index.html', software_list=software_list, devices=devices, installed=installed, predefined_software=predefined_software)
+# Асинхронное обновление версий
+@app.route('/refresh_versions_async')
+def refresh_versions_async():
+    software_list = Software.query.all()
+    with ThreadPoolExecutor() as executor:
+        latest_versions = list(executor.map(fetch_latest_version_cached, [s.name for s in software_list]))
+    for software, latest_version in zip(software_list, latest_versions):
+        if latest_version != "Неизвестно":
+            software.latest_version = latest_version
+    db.session.commit()
+    return jsonify({"message": "Версии обновлены!"})
 
 # Маршрут для списка ПО
 @app.route('/software_list')
 def software_list():
-    software_list = Software.query.all()  # Получаем все ПО из базы данных
+    software_list = Software.query.all()
     predefined_software = [
-        {'name': 'Visual Studio Code', 'latest_version': fetch_latest_version('Visual Studio Code')},
-        {'name': 'PyCharm', 'latest_version': fetch_latest_version('PyCharm')},
-        {'name': 'Git', 'latest_version': fetch_latest_version('Git')},
-        {'name': 'Node.js', 'latest_version': fetch_latest_version('Node.js')},
-        {'name': 'Python', 'latest_version': fetch_latest_version('Python')},
-        {'name': 'Docker', 'latest_version': fetch_latest_version('Docker')},
-        {'name': 'Kubernetes', 'latest_version': fetch_latest_version('Kubernetes')},
-        {'name': 'IntelliJ IDEA', 'latest_version': fetch_latest_version('IntelliJ IDEA')},
-        {'name': 'WebStorm', 'latest_version': fetch_latest_version('WebStorm')},
-        {'name': 'Ruby', 'latest_version': fetch_latest_version('Ruby')},
-        {'name': 'Rails', 'latest_version': fetch_latest_version('Rails')},
-        {'name': 'PHP', 'latest_version': fetch_latest_version('PHP')},
-        {'name': 'Laravel', 'latest_version': fetch_latest_version('Laravel')},
-        {'name': 'Java', 'latest_version': fetch_latest_version('Java')},
-        {'name': 'Android Studio', 'latest_version': fetch_latest_version('Android Studio')}
+        {'name': name, 'latest_version': next((s.latest_version for s in software_list if s.name.lower() == name.lower()), fetch_latest_version_cached(name))}
+        for name in ['Visual Studio Code', 'PyCharm', 'Git', 'Node.js', 'Python', 'Docker', 'Kubernetes',
+                     'IntelliJ IDEA', 'WebStorm', 'Ruby', 'Rails', 'PHP', 'Laravel', 'Java', 'Android Studio']
     ]
     return render_template('software_list.html', software_list=software_list, predefined_software=predefined_software)
 
@@ -96,8 +101,8 @@ def add_software():
     if request.method == 'POST':
         name = request.form['name']
         current_version = request.form['current_version']
-        latest_version = fetch_latest_version(name)
-        if latest_version == "Unknown":
+        latest_version = fetch_latest_version_cached(name)
+        if latest_version == "Неизвестно":
             latest_version = request.form['latest_version']
         software = Software(name=name, current_version=current_version, latest_version=latest_version)
         db.session.add(software)
@@ -112,8 +117,8 @@ def edit_software(id):
     if request.method == 'POST':
         software.name = request.form['name']
         software.current_version = request.form['current_version']
-        latest_version = fetch_latest_version(software.name)
-        if latest_version == "Unknown":
+        latest_version = fetch_latest_version_cached(software.name)
+        if latest_version == "Неизвестно":
             latest_version = request.form['latest_version']
         software.latest_version = latest_version
         db.session.commit()
@@ -133,15 +138,10 @@ def delete_software(id):
 def add_device():
     if request.method == 'POST':
         name = request.form['name']
-        ip_address = request.form['ip_address']
-        mac_address = request.form['mac_address']
+        ip_address = request.form['ip_address'] if request.form['ip_address'] else None
+        mac_address = request.form['mac_address'] if request.form['mac_address'] else None
         responsible_person = request.form['responsible_person']
-        device = Device(
-            name=name,
-            ip_address=ip_address if ip_address else None,
-            mac_address=mac_address if mac_address else None,
-            responsible_person=responsible_person
-        )
+        device = Device(name=name, ip_address=ip_address, mac_address=mac_address, responsible_person=responsible_person)
         db.session.add(device)
         db.session.commit()
         return redirect(url_for('index'))
@@ -184,7 +184,7 @@ def add_installed_software():
         db.session.commit()
         return redirect(url_for('index'))
     devices = Device.query.all()
-    softwares = Software.query.all()
+    softwares = Software.query.all()  # Теперь используем реальные записи из Software
     return render_template('add_installed_software.html', devices=devices, softwares=softwares)
 
 # Страница для редактирования установленного ПО
